@@ -1,0 +1,60 @@
+# TLSPretense Configuration File - https://github.com/iSECPartners/tlspretense/
+---
+hostname: localhost.localdomain
+
+certmaker:
+  outdir: certs
+  defaultsubject: &defaultsubject "C=US, CN=%HOSTNAME%"
+  missing_serial_generation: random
+
+logger:
+  level: INFO
+  file: '-'
+
+# Settings Common to All Certificates
+_base_cert_settings: &base_cert_settings
+  not_before: now
+  not_after: +1825
+  key_type: RSA
+  key_size: 2048
+  signing_alg: SHA256
+
+# CA Certificate Settings
+_ca_settings: &ca_settings
+  <<: *base_cert_settings
+  issuer: self
+  extensions:
+  - "keyUsage = critical, keyCertSign"  # can sign certificates
+  - "basicConstraints = critical,CA:true"
+  - "subjectKeyIdentifier=hash"
+  - "authorityKeyIdentifier=keyid:always"
+
+# Client/Server Certificate Settings
+_cert_settings: &cert_settings
+  <<: *base_cert_settings
+  issuer: testca
+  extensions:
+  - "subjectAltName=IP:::1,IP:127.0.0.1,DNS:localhost,DNS:%HOSTNAME%"
+  - "keyUsage=digitalSignature, keyEncipherment" # can sign data and can encrypt symmetric keys
+  - "extendedKeyUsage=serverAuth, clientAuth" # can be used as both a www server cert and www client cert
+  - "authorityKeyIdentifier=keyid:always"
+  - "subjectKeyIdentifier=hash"
+  - "basicConstraints = critical,CA:FALSE"
+
+# Certificate Generation
+certs:
+  testca:
+    <<: *ca_settings
+    subject: "O=Test Suite, OU=Certificate Authority, CN=%HOSTNAME%"
+
+  server:
+    <<: *cert_settings
+    subject: "O=Test Suite, OU=Server, CN=%HOSTNAME%"
+
+  authserver:
+    <<: *cert_settings
+    subject: "O=Test Suite, OU=Auth Server, CN=%HOSTNAME%"
+
+  client:
+    <<: *cert_settings
+    subject: "O=Test Suite, OU=Client, CN=%HOSTNAME%"

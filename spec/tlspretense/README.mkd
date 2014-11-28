@@ -1,0 +1,32 @@
+# TLS Testing Configuration
+
+This directory houses the configuration for
+[tlspretense](https://github.com/iSECPartners/tlspretense).  These certificates
+should __NEVER__ be used outside of the test suite for _ANY_ reason at all.
+Upon resolution of [this issue](https://github.com/iSECPartners/tlspretense/issues/3),
+the certificates will not be distributed in the repository, but will be generated
+during the test runs, and cleaned up afterwards (to mimic the previous behavior).
+
+## Usage
+
+To purge and recreate the certificates, run:
+
+    make clean all
+
+Which has the following shell dependencies:
+
+  * make
+  * tlspretense
+  * openssl
+  * keytool (distributed with JDK)
+
+## Details
+
+Under the hood, what is happening is the following:
+
+  * tlspretense generates a self-signed CA certificate and signs several server and client certificates, all of which are valid for 5 years
+  * openssl creates a PKCS12 keystore containing the client certificate
+  * keytool creates a JKS truststore containing the CA
+
+This presents a wide range of formats to satisfy both, WEBrick (OpenSSL-based) and the underlying Java libraries.
+

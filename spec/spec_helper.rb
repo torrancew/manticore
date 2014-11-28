@@ -4,10 +4,18 @@ require 'manticore'
 require 'zlib'
 require 'json'
 require 'rack'
+require 'openssl'
 require 'webrick'
 require 'webrick/https'
 
 PORT = 55441
+
+# TLS Test Related Variables
+$certdir         = File.join(File.dirname(__FILE__), 'tlspretense', 'certs')
+$keystore        = File.join($certdir, 'keystore.p12')
+$keystore_pass   = 'foobar'
+$truststore      = File.join($certdir, 'truststore.jks')
+$truststore_pass = 'foobar'
 
 def local_server(path = "/", port = PORT)
   URI.join("http://localhost:#{port}", path).to_s
@@ -88,11 +96,16 @@ def stop_servers
 end
 
 def start_ssl_server(port)
-  cert_name = [
-    %w[CN localhost],
-  ]
+  pkey   = OpenSSL::PKey::RSA.new(File.read(File.join($certdir, 'serverkey.pem')))
+  cert   = OpenSSL::X509::Certificate.new(File.read(File.join($certdir, 'servercert.pem')))
+  cacert = OpenSSL::X509::Certificate.new(File.read(File.join($certdir, 'testcacert.pem')))
+
   @servers[port] = Thread.new {
-    server = WEBrick::HTTPServer.new(:Port => port, :SSLEnable => true, :SSLCertName => cert_name, :Logger => WEBrick::Log.new("/dev/null"))
+    server = WEBrick::HTTPServer.new(
+      :Port => port, :Logger => WEBrick::Log.new("/dev/null"),
+      :SSLEnable => true, :SSLPrivateKey => pkey, :SSLCertificate => cert
+    )
+
     server.mount_proc "/" do |req, res|
       res.body = "hello!"
     end
@@ -114,3 +127,4 @@ RSpec.configure do |c|
 
   c.after(:suite)  { stop_servers }
 end
+
