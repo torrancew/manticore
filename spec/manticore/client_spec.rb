@@ -86,6 +86,24 @@ describe Manticore::Client do
         end
       end
     end
+
+    describe 'truststore' do
+      context 'when set' do
+        let(:client) { Manticore::Client.new :ssl => {:truststore => $truststore, :truststore_password => $truststore_pass}}
+
+        it "should not break on SSL validation errors" do
+          expect { client.get("https://localhost:55444/").call }.to_not raise_exception
+        end
+      end
+
+      context 'when unset' do
+        let(:client) { Manticore::Client.new :ssl => {} }
+
+        it "should break on SSL validation errors" do
+          expect { client.get("https://localhost:55444/").call }.to raise_exception(Manticore::ClientProtocolException)
+        end
+      end
+    end
   end
 
   describe "lazy evaluation" do

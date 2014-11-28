@@ -468,13 +468,36 @@ module Manticore
 
     # Configure the SSL Context
     def ssl_sf_from_options(ssl_options)
+      ctx_builder = SSLContexts.custom.useTLS
+
       ### Trust Root Settings ###
       if ssl_options.fetch(:verify, true) == false
-        context = SSLContexts.custom.load_trust_material(nil, TrustSelfSignedStrategy.new).build
-        SSLConnectionSocketFactory.new(context, SSLConnectionSocketFactory::ALLOW_ALL_HOSTNAME_VERIFIER)
+        return SSLConnectionSocketFactory.new(
+          ctx_builder.load_trust_material(nil, TrustSelfSignedStrategy.new).build,
+          SSLConnectionSocketFactory::ALLOW_ALL_HOSTNAME_VERIFIER
+        )
+      elsif ssl_options.fetch(:truststore, nil) != nil
+        if ssl_options.fetch(:truststore_password, nil) == nil
+          raise 'ssl[:truststore] also requires ssl[:truststore_password]!'
+        end
+        return SSLConnectionSocketFactory.new(
+          ctx_builder.load_trust_material(
+            load_keystore(ssl_options[:truststore],
+                          ssl_options[:truststore_password])
+          ).build
+        )
       else
-        SSLConnectionSocketFactory.get_socket_factory
+        SSLConnectionSocketFactory.new(ctx_builder.build)
       end
+    end
+
+    # Load a KeyStore from Disk
+    def load_keystore(file, password, type='JKS')
+      jks = java.security.KeyStore.getInstance(type)
+      File.open(file, 'r') do |fin|
+        jks.load(fin.to_inputstream, password.to_java.to_char_array)
+      end
+      return jks
     end
   end
 end
