@@ -95,16 +95,30 @@ def stop_servers
   @servers.values.each(&:kill) if @servers
 end
 
-def start_ssl_server(port)
-  pkey   = OpenSSL::PKey::RSA.new(File.read(File.join($certdir, 'serverkey.pem')))
-  cert   = OpenSSL::X509::Certificate.new(File.read(File.join($certdir, 'servercert.pem')))
+def start_ssl_server(port, client_auth=false)
+  if client_auth
+    server_name = 'authserver'
+  else
+    server_name = 'server'
+  end
+
+  pkey   = OpenSSL::PKey::RSA.new(File.read(File.join($certdir, "#{server_name}key.pem")))
+  cert   = OpenSSL::X509::Certificate.new(File.read(File.join($certdir, "#{server_name}cert.pem")))
   cacert = OpenSSL::X509::Certificate.new(File.read(File.join($certdir, 'testcacert.pem')))
 
   @servers[port] = Thread.new {
-    server = WEBrick::HTTPServer.new(
-      :Port => port, :Logger => WEBrick::Log.new("/dev/null"),
-      :SSLEnable => true, :SSLPrivateKey => pkey, :SSLCertificate => cert
-    )
+    config = {
+      :Port => port, :Logger => WEBrick::Log.new($stderr),
+      :SSLEnable => true, :SSLPrivateKey => pkey, :SSLCertificate => cert,
+    }
+    if client_auth
+      config.merge!({
+        :SSLVerifyClient => OpenSSL::SSL::VERIFY_NONE|OpenSSL::SSL::VERIFY_FAIL_IF_NO_PEER_CERT,
+        :SSLClientCA => cacert
+      })
+    end
+
+    server = WEBrick::HTTPServer.new(config)
 
     server.mount_proc "/" do |req, res|
       res.body = "hello!"
@@ -123,6 +137,7 @@ RSpec.configure do |c|
     start_server 55441
     start_server 55442
     start_ssl_server 55444
+    start_ssl_server 55443, true
   }
 
   c.after(:suite)  { stop_servers }

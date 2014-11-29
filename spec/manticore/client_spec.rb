@@ -104,6 +104,33 @@ describe Manticore::Client do
         end
       end
     end
+
+    describe 'keystore' do
+      context 'when set' do
+        let(:client) { Manticore::Client.new :ssl => {
+          :truststore          => $truststore,
+          :truststore_password => $truststore_pass,
+          :keystore            => $keystore,
+          :keystore_password   => $keystore_pass,
+        }}
+
+        it "should successfully authenticate via TLS when required" do
+          expect { client.get("https://localhost:55443/").call }.to_not raise_exception
+          client.get('https://localhost:55443/').code.should == 200
+        end
+      end
+
+      context 'when unset' do
+        let(:client) { Manticore::Client.new :ssl => {
+          :truststore          => $truststore,
+          :truststore_password => $truststore_pass,
+        }}
+
+        it "should error when failing to authenticate via TLS when required" do
+          expect { client.get("https://localhost:55443/").call }.to raise_exception(Manticore::ClientProtocolException)
+        end
+      end
+    end
   end
 
   describe "lazy evaluation" do

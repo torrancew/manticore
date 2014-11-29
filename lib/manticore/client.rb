@@ -469,26 +469,39 @@ module Manticore
     # Configure the SSL Context
     def ssl_sf_from_options(ssl_options)
       ctx_builder = SSLContexts.custom.useTLS
+      verifier    = SSLConnectionSocketFactory::BROWSER_COMPATIBLE_HOSTNAME_VERIFIER
 
       ### Trust Root Settings ###
       if ssl_options.fetch(:verify, true) == false
-        return SSLConnectionSocketFactory.new(
-          ctx_builder.load_trust_material(nil, TrustSelfSignedStrategy.new).build,
-          SSLConnectionSocketFactory::ALLOW_ALL_HOSTNAME_VERIFIER
-        )
+        ctx_builder.load_trust_material(nil, TrustSelfSignedStrategy.new)
+        verifier = SSLConnectionSocketFactory::ALLOW_ALL_HOSTNAME_VERIFIER
       elsif ssl_options.fetch(:truststore, nil) != nil
         if ssl_options.fetch(:truststore_password, nil) == nil
           raise 'ssl[:truststore] also requires ssl[:truststore_password]!'
         end
-        return SSLConnectionSocketFactory.new(
-          ctx_builder.load_trust_material(
-            load_keystore(ssl_options[:truststore],
-                          ssl_options[:truststore_password])
-          ).build
+        ctx_builder.load_trust_material(
+          load_keystore(ssl_options[:truststore],
+                        ssl_options[:truststore_password])
         )
-      else
-        SSLConnectionSocketFactory.new(ctx_builder.build)
       end
+
+      if ssl_options.fetch(:keystore, nil) != nil
+        if ssl_options.fetch(:truststore_password, nil) == nil
+          raise 'ssl[:truststore] also requires ssl[:truststore_password]!'
+        end
+        case ssl_options[:keystore]
+        when /\.(?i:p(?:fx|12))$/
+          type = 'PKCS12'
+        else
+          type = 'JKS'
+        end
+        ctx_builder.load_key_material(
+          load_keystore(ssl_options[:keystore], ssl_options[:keystore_password], type),
+          ssl_options[:keystore_password].to_java.to_char_array
+        )
+      end
+
+      return SSLConnectionSocketFactory.new(ctx_builder.build, verifier)
     end
 
     # Load a KeyStore from Disk
